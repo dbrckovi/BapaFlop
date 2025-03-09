@@ -11,15 +11,22 @@ status_message: cstring = "no message yet"
 status_message_color := rl.Color{214, 155, 128, 255}
 status_message_backcolor := rl.Color{40, 23, 51, 255}
 
+currentLevel: Level
+
 init :: proc() {
 	run = true
 	rl.SetConfigFlags({.VSYNC_HINT})
 	rl.InitWindow(WINDOW_SIZE.x, WINDOW_SIZE.y, "BapaFlop")
+	currentLevel = init_level() //Initial level
 }
 
 update :: proc() {
 	rl.BeginDrawing()
 	rl.ClearBackground(back_color)
+
+	for spawner in currentLevel.spawner {
+		draw_spawner(spawner)
+	}
 
 	// status message
 	rl.DrawRectangleRec(
