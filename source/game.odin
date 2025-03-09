@@ -1,5 +1,6 @@
 package game
 
+import "core:fmt"
 import rl "vendor:raylib"
 
 WINDOW_SIZE: [2]i32 = {800, 600}
@@ -23,6 +24,7 @@ init :: proc() {
 update :: proc() {
 	rl.BeginDrawing()
 	rl.ClearBackground(back_color)
+	status_message = fmt.ctprintf("%i fps", rl.GetFPS())
 
 	for spawner in currentLevel.spawner {
 		draw_spawner(spawner)
