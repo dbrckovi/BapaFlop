@@ -10,7 +10,6 @@ run: bool
 back_color := rl.Color{49, 34, 73, 255}
 status_message: cstring = "no message yet"
 status_message_color := rl.Color{214, 155, 128, 255}
-status_message_backcolor := rl.Color{40, 23, 51, 255}
 
 currentLevel: Level
 
@@ -24,18 +23,20 @@ init :: proc() {
 update :: proc() {
 	rl.BeginDrawing()
 	rl.ClearBackground(back_color)
-	status_message = fmt.ctprintf("%i fps", rl.GetFPS())
+	status_message = fmt.ctprintf(
+		"%i, %i",
+		i32(rl.GetMousePosition().x),
+		i32(rl.GetMousePosition().y),
+	)
 
-	for spawner in currentLevel.spawner {
-		draw_spawner(spawner)
-	}
+	draw_level(currentLevel)
 
 	// status message
-	rl.DrawRectangleRec(
-		{2, f32(WINDOW_SIZE.y - 20), f32(WINDOW_SIZE.x - 4), 18},
-		status_message_backcolor,
-	)
-	rl.DrawText(status_message, 8, WINDOW_SIZE.y - 18, 15, status_message_color)
+	// rl.DrawRectangleRec(
+	// 	{2, f32(WINDOW_SIZE.y - 30), f32(WINDOW_SIZE.x - 4), 28},
+	// 	status_message_backcolor,
+	// )
+	// rl.DrawText(status_message, 8, WINDOW_SIZE.y - 25, 22, status_message_color)
 
 	rl.EndDrawing()
 
