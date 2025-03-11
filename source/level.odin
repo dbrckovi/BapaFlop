@@ -142,7 +142,6 @@ draw_flipper :: proc(flipper: Flipper) {
 	if flipper.active {
 		center := get_rectangle_center(flipper.rectangle)
 		r: rl.Rectangle = {center.x - 20, center.y - 10, 40, 20}
-		// using flipper.rectangle
 		if flipper.direction == -1 {
 			rl.DrawLine(i32(r.x), i32(r.y + r.height), i32(r.x + r.width), i32(r.y), rl.BROWN)
 		} else {
@@ -153,8 +152,6 @@ draw_flipper :: proc(flipper: Flipper) {
 
 draw_hatch :: proc(hatch: Hatch) {
 	if hatch.active {
-		using hatch
-		// rl.DrawRectangleRec(spawner.rectangle, rl.GREEN)
 		rl.DrawRectangleLinesEx(hatch.rectangle, 1, rl.PURPLE)
 	}
 }
