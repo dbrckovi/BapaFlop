@@ -36,6 +36,12 @@ Hatch :: struct {
 	active:    bool, // determines if hatch is in the level
 }
 
+GameBall :: struct {
+	center:           [2]f32, // determines where ball center is
+	speed:            rl.Vector2, // pixels per second
+	last_bounced_row: int, // don't perform collision checks on this row of flippers or all above it 
+}
+
 init_level :: proc() -> Level {
 	ret := Level {
 		name  = "TEST LEVEL",
@@ -68,6 +74,7 @@ init_level :: proc() -> Level {
 	return ret
 }
 
+// Draws all game elements
 draw_level :: proc(level: Level) {
 	draw_level_borders()
 
@@ -89,6 +96,11 @@ draw_level :: proc(level: Level) {
 	for hatch in currentLevel.hatch {
 		draw_hatch(hatch)
 	}
+
+	if ballInPlay {
+		draw_game_ball()
+	}
+
 }
 
 draw_level_borders :: proc() {
@@ -122,22 +134,19 @@ draw_level_stats :: proc(level: Level) {
 
 draw_spawner :: proc(spawner: Spawner) {
 	if spawner.active {
-		using spawner
-		// rl.DrawRectangleRec(spawner.rectangle, rl.GREEN)
 		rl.DrawRectangleLinesEx(spawner.rectangle, 1, rl.DARKGREEN)
 	}
 }
 
 draw_flipper :: proc(flipper: Flipper) {
 	if flipper.active {
-		using flipper
-		rl.DrawRectangleLinesEx(flipper.rectangle, 1, rl.DARKGRAY)
-
-		using flipper.rectangle
+		center := get_rectangle_center(flipper.rectangle)
+		r: rl.Rectangle = {center.x - 20, center.y - 10, 40, 20}
+		// using flipper.rectangle
 		if flipper.direction == -1 {
-			rl.DrawLine(i32(x), i32(y + height), i32(x + width), i32(y), rl.BROWN)
+			rl.DrawLine(i32(r.x), i32(r.y + r.height), i32(r.x + r.width), i32(r.y), rl.BROWN)
 		} else {
-			rl.DrawLine(i32(x), i32(y), i32(x + width), i32(y + height), rl.BROWN)
+			rl.DrawLine(i32(r.x), i32(r.y), i32(r.x + r.width), i32(r.y + r.height), rl.BROWN)
 		}
 	}
 }
@@ -147,6 +156,12 @@ draw_hatch :: proc(hatch: Hatch) {
 		using hatch
 		// rl.DrawRectangleRec(spawner.rectangle, rl.GREEN)
 		rl.DrawRectangleLinesEx(hatch.rectangle, 1, rl.PURPLE)
+	}
+}
+
+draw_game_ball :: proc() {
+	if ballInPlay {
+		rl.DrawCircleV(gameBall.center, 10, rl.BLUE)
 	}
 }
 
