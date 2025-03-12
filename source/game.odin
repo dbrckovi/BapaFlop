@@ -1,6 +1,8 @@
 package game
 
 import "core:fmt"
+// import "core:os"
+// import "core:strings"
 import rl "vendor:raylib"
 
 WINDOW_SIZE: [2]i32 = {800, 600}
@@ -8,35 +10,42 @@ WINDOW_SIZE: [2]i32 = {800, 600}
 run: bool
 
 back_color := rl.Color{49, 34, 73, 255}
-status_message: cstring = "no message yet"
-status_message_color := rl.Color{214, 155, 128, 255}
-
+clipboardLevel: Level
 currentLevel: Level
 ballInPlay: bool
 gameBall: GameBall // relevant only if ballInPlay is true TODO: convert to Maybe(GameBall)
 gravity: f32 = 200
 
+design_mode := false
+help_visible := false
+
 init :: proc() {
 	run = true
 	rl.SetConfigFlags({.VSYNC_HINT})
 	rl.InitWindow(WINDOW_SIZE.x, WINDOW_SIZE.y, "BapaFlop")
-	currentLevel = init_level() //Initial level
+	currentLevel = init_level()
+	clipboardLevel = currentLevel
 }
 
 update :: proc() {
 	frame_time := rl.GetFrameTime()
 	rl.BeginDrawing()
 	rl.ClearBackground(back_color)
-	// status_message = fmt.ctprintf(
-	// 	"%i, %i",
-	// 	i32(rl.GetMousePosition().x),
-	// 	i32(rl.GetMousePosition().y),
-	// )
+
+	if rl.IsKeyPressed(rl.KeyboardKey.D) {
+		// if rl.IsKeyPressed(rl.KeyboardKey.F10) && ODIN_OS != .JS {
+		design_mode = !design_mode
+	}
+
+	if rl.IsKeyPressed(rl.KeyboardKey.H) {
+		help_visible = !help_visible
+	}
 
 	// update ball position (if it exists)
 	if ballInPlay {
 		gameBall.speed.y += gravity * frame_time
 		gameBall.center += gameBall.speed * frame_time
+		gameBall.radius = 13
 
 		if gameBall.center.y > f32(WINDOW_SIZE.y) {
 			ballInPlay = false
@@ -44,18 +53,38 @@ update :: proc() {
 		}
 
 		flipper_collision_check()
+		wall_collision_check()
 	}
-
 
 	if rl.IsMouseButtonReleased(rl.MouseButton.LEFT) {
 		if !ballInPlay {
 			spawn_ball_if_clicked()
+			if design_mode {
+				flip_flipper_if_clicked()
+			}
+		}
+	}
+
+	if rl.IsMouseButtonReleased(rl.MouseButton.RIGHT) {
+		if !ballInPlay {
+			if design_mode {
+				toggle_flipper_active_if_clicked()
+				toggle_spawner_active_if_clicked()
+				toggle_hatch_active_if_clicked()
+			}
 		}
 	}
 
 	draw_level(currentLevel)
 
-	rl.DrawText(status_message, 8, WINDOW_SIZE.y - 25, 22, status_message_color)
+	if help_visible {
+		draw_help()
+	}
+
+	rl.DrawText("H: help", 8, WINDOW_SIZE.y - 16, 16, HELP_TEXT_COLOR)
+	// if ODIN_OS != .JS {
+	rl.DrawText("D: toggle design mode", 200, WINDOW_SIZE.y - 16, 16, HELP_TEXT_COLOR)
+	// }
 
 	rl.EndDrawing()
 
@@ -90,7 +119,7 @@ should_run :: proc() -> bool {
 spawn_ball_if_clicked :: proc() {
 	mouse_pos := rl.GetMousePosition()
 	for spawner in currentLevel.spawner {
-		if rectangle_intersects(mouse_pos, spawner.rectangle) {
+		if rectangle_intersects(mouse_pos, spawner.rectangle) && spawner.active {
 			gameBall = {
 				center           = get_rectangle_center(spawner.rectangle),
 				speed            = rl.Vector2{0, 0},
@@ -102,6 +131,69 @@ spawn_ball_if_clicked :: proc() {
 	}
 }
 
+flip_flipper_if_clicked :: proc() {
+	mouse_pos := rl.GetMousePosition()
+
+	for y := 0; y < 4; y += 1 {
+		for x := 0; x < 8; x += 1 {
+			flip := &currentLevel.flipper[y][x]
+
+			if rectangle_intersects(mouse_pos, flip.rectangle) {
+				flip.direction *= -1
+				break
+			}
+		}
+	}
+}
+
+toggle_flipper_active_if_clicked :: proc() {
+	mouse_pos := rl.GetMousePosition()
+
+	for y := 0; y < 4; y += 1 {
+		for x := 0; x < 8; x += 1 {
+			flip := &currentLevel.flipper[y][x]
+
+			if rectangle_intersects(mouse_pos, flip.rectangle) {
+				flip.active = !flip.active
+				break
+			}
+		}
+	}
+}
+
+toggle_spawner_active_if_clicked :: proc() {
+	mouse_pos := rl.GetMousePosition()
+
+	for &spawner in currentLevel.spawner {
+		if rectangle_intersects(mouse_pos, spawner.rectangle) {
+			spawner.active = !spawner.active
+			break
+		}
+	}
+}
+
+toggle_hatch_active_if_clicked :: proc() {
+	mouse_pos := rl.GetMousePosition()
+
+	for &hatch in currentLevel.hatch {
+		if rectangle_intersects(mouse_pos, hatch.rectangle) {
+			hatch.active = !hatch.active
+			break
+		}
+	}
+}
+
+
+// checks if ball (if in play) is colliding with any wall and handles the bounce
+wall_collision_check :: proc() {
+	if gameBall.speed.x < 0 && gameBall.center.x < gameBall.radius {
+		gameBall.speed.x *= -0.5
+	}
+	if gameBall.speed.x > 0 && gameBall.center.x > (f32(WINDOW_SIZE.x) - gameBall.radius) {
+		gameBall.speed.x *= -0.5
+	}
+}
+
 // Checks if ball (if in play) is colliding with any flipper and handles the bounce
 flipper_collision_check :: proc() {
 	for y := gameBall.last_bounced_row + 1; y < 4; y += 1 {
@@ -109,7 +201,7 @@ flipper_collision_check :: proc() {
 			flip := &currentLevel.flipper[y][x]
 			if flip.active {
 				if rectangle_intersects(gameBall.center, flip.rectangle) {
-					//game collided with flipper
+					//ball collided with flipper
 					flipper_center := get_rectangle_center(flip.rectangle)
 					gameBall.center.x = flipper_center.x
 					gameBall.speed.x = f32(flip.direction * 100)
@@ -143,5 +235,15 @@ debug_print :: proc(message: any) {
 	fmt.println("----------------DEBUG----------------")
 	fmt.println(message)
 	fmt.println("-------------------------------------")
+}
+
+draw_help :: proc() {
+	background_rectangle := rl.Rectangle{20, 50, f32(WINDOW_SIZE.x - 40), f32(WINDOW_SIZE.y - 100)}
+
+	rl.DrawRectangleRounded(background_rectangle, 0.1, 1, LEVEL_SHADOW_COLOR)
+	rl.DrawRectangleRoundedLines(background_rectangle, 0.1, 1, rl.GRAY)
+
+	text: cstring = design_mode ? HELP_TEXT_DESIGN : HELP_TEXT_GAME
+	rl.DrawText(text, 35, 75, 20, HELP_TEXT_COLOR)
 }
 

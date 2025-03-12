@@ -1,5 +1,7 @@
 package game
 
+import "core:strconv"
+import "core:strings"
 import rl "vendor:raylib"
 
 SPAWNER_TOP :: 50
@@ -40,6 +42,7 @@ GameBall :: struct {
 	center:           [2]f32, // determines where ball center is
 	speed:            rl.Vector2, // pixels per second
 	last_bounced_row: int, // don't perform collision checks on this row of flippers or all above it 
+	radius:           f32, // ball radius
 }
 
 init_level :: proc() -> Level {
@@ -114,7 +117,13 @@ draw_level_borders :: proc() {
 }
 
 draw_level_stats :: proc(level: Level) {
-	rl.DrawText(level.name, 8, 8, 22, LEVEL_NAME_COLOR)
+	if design_mode {
+		level_code := level_to_string(level)
+		// rl.DrawText("DESIGN MODE", 8, 8, 22, rl.RED)
+		rl.DrawText(level_code, 8, 8, 22, rl.RED)
+	} else {
+		rl.DrawText(level.name, 8, 8, 22, LEVEL_NAME_COLOR)
+	}
 
 	// draw balls left to score
 	ballsToScore := level.balls - level.score
@@ -133,12 +142,18 @@ draw_level_stats :: proc(level: Level) {
 }
 
 draw_spawner :: proc(spawner: Spawner) {
+	if design_mode {
+		rl.DrawRectangleLinesEx(spawner.rectangle, 1, LEVEL_SHADOW_COLOR)
+	}
 	if spawner.active {
 		rl.DrawRectangleLinesEx(spawner.rectangle, 1, rl.DARKGREEN)
 	}
 }
 
 draw_flipper :: proc(flipper: Flipper) {
+	if design_mode {
+		rl.DrawRectangleLinesEx(flipper.rectangle, 1, LEVEL_SHADOW_COLOR)
+	}
 	if flipper.active {
 		center := get_rectangle_center(flipper.rectangle)
 		r: rl.Rectangle = {center.x - 20, center.y - 10, 40, 20}
@@ -151,6 +166,9 @@ draw_flipper :: proc(flipper: Flipper) {
 }
 
 draw_hatch :: proc(hatch: Hatch) {
+	if design_mode {
+		rl.DrawRectangleLinesEx(hatch.rectangle, 1, LEVEL_SHADOW_COLOR)
+	}
 	if hatch.active {
 		rl.DrawRectangleLinesEx(hatch.rectangle, 1, rl.PURPLE)
 	}
@@ -158,7 +176,33 @@ draw_hatch :: proc(hatch: Hatch) {
 
 draw_game_ball :: proc() {
 	if ballInPlay {
-		rl.DrawCircleV(gameBall.center, 10, rl.BLUE)
+		rl.DrawCircleV(gameBall.center, gameBall.radius, rl.BLUE)
 	}
+}
+
+// Generates level string from level
+level_to_string :: proc(level: Level) -> cstring {
+	spawner_bits: i32
+
+	#reverse for spawner in level.spawner {
+		spawner_bits = spawner_bits << 1
+		if spawner.active {
+			spawner_bits |= 1
+		}
+	}
+
+	return int_to_string(i64(spawner_bits))
+}
+
+// Decodes the level string and populates the level accordingly
+string_to_level :: proc(levelString: string, level: ^Level) {
+
+}
+
+int_to_string :: proc(value: i64) -> cstring {
+	buf: [4]byte
+	result := strings.clone_to_cstring(strconv.append_int(buf[:], value, 10))
+	// fmt.println(result, buf)
+	return result
 }
 
