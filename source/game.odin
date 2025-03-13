@@ -1,8 +1,7 @@
 package game
 
 import "core:fmt"
-// import "core:os"
-// import "core:strings"
+import "core:strings"
 import rl "vendor:raylib"
 
 WINDOW_SIZE: [2]i32 = {800, 600}
@@ -10,11 +9,12 @@ WINDOW_SIZE: [2]i32 = {800, 600}
 run: bool
 
 back_color := rl.Color{49, 34, 73, 255}
-clipboardLevel: Level
+clipBoardLevelString: cstring = "FF,FF00,FF00,FF00,FF00,FF"
 currentLevel: Level
 ballInPlay: bool
 gameBall: GameBall // relevant only if ballInPlay is true TODO: convert to Maybe(GameBall)
 gravity: f32 = 200
+friction: f32 = 200
 
 design_mode := false
 help_visible := false
@@ -23,9 +23,10 @@ status_message: cstring = ""
 init :: proc() {
 	run = true
 	rl.SetConfigFlags({.VSYNC_HINT})
+	rl.SetTargetFPS(500)
 	rl.InitWindow(WINDOW_SIZE.x, WINDOW_SIZE.y, "BapaFlop")
 	currentLevel = init_level()
-	clipboardLevel = currentLevel
+	// string_to_level("BD,7E08,7E1C,7E08,7E08,66", &currentLevel)
 }
 
 update :: proc() {
@@ -33,18 +34,12 @@ update :: proc() {
 	rl.BeginDrawing()
 	rl.ClearBackground(back_color)
 
-	if rl.IsKeyPressed(rl.KeyboardKey.D) {
-		design_mode = !design_mode
-	}
-
-	if rl.IsKeyPressed(rl.KeyboardKey.H) {
-		help_visible = !help_visible
-	}
-
 	// update ball position (if it exists)
 	if ballInPlay {
 		gameBall.speed.y += gravity * frame_time
-		gameBall.speed.x *= 0.983
+		if (gameBall.speed.x > 0) {gameBall.speed.x -= friction * frame_time}
+		if (gameBall.speed.x < 0) {gameBall.speed.x += friction * frame_time}
+		// gameBall.speed.x *= 0.983
 		gameBall.center += gameBall.speed * frame_time
 		gameBall.radius = 13
 
@@ -55,19 +50,36 @@ update :: proc() {
 
 		flipper_collision_check()
 		wall_collision_check()
-	}
+	} else {
+		if rl.IsKeyPressed(rl.KeyboardKey.D) {
+			design_mode = !design_mode
+		}
 
-	if rl.IsMouseButtonReleased(rl.MouseButton.LEFT) {
-		if !ballInPlay {
+		if rl.IsKeyPressed(rl.KeyboardKey.H) {
+			help_visible = !help_visible
+		}
+
+		if rl.IsKeyPressed(rl.KeyboardKey.C) {
+			clipBoardLevelString = level_to_string(currentLevel)
+			status_message = strings.clone_to_cstring(
+				strings.join({"Level saved: ", string(clipBoardLevelString)}, ""),
+			)
+		}
+
+		if rl.IsKeyPressed(rl.KeyboardKey.V) {
+			string_to_level(clipBoardLevelString, &currentLevel)
+			status_message = strings.clone_to_cstring(
+				strings.join({"Level restored: ", string(clipBoardLevelString)}, ""),
+			)
+		}
+
+		if rl.IsMouseButtonReleased(rl.MouseButton.LEFT) {
 			spawn_ball_if_clicked()
 			if design_mode {
 				flip_flipper_if_clicked()
 			}
 		}
-	}
-
-	if rl.IsMouseButtonReleased(rl.MouseButton.RIGHT) {
-		if !ballInPlay {
+		if rl.IsMouseButtonReleased(rl.MouseButton.RIGHT) {
 			if design_mode {
 				toggle_flipper_active_if_clicked()
 				toggle_spawner_active_if_clicked()
@@ -76,13 +88,14 @@ update :: proc() {
 		}
 	}
 
+
 	draw_level(currentLevel)
 
 	if help_visible {
 		draw_help()
 	}
 
-	if len(status_message) == 0 {
+	if len(status_message) == 0 && !ballInPlay {
 		rl.DrawText("H: help", 8, WINDOW_SIZE.y - 16, 16, HELP_TEXT_COLOR)
 		rl.DrawText("D: toggle design mode", 200, WINDOW_SIZE.y - 16, 16, HELP_TEXT_COLOR)
 	} else {
@@ -186,14 +199,13 @@ toggle_hatch_active_if_clicked :: proc() {
 	}
 }
 
-
 // checks if ball (if in play) is colliding with any wall and handles the bounce
 wall_collision_check :: proc() {
 	if gameBall.speed.x < 0 && gameBall.center.x < gameBall.radius {
-		gameBall.speed.x *= -0.5
+		gameBall.speed.x *= -0.8
 	}
 	if gameBall.speed.x > 0 && gameBall.center.x > (f32(WINDOW_SIZE.x) - gameBall.radius) {
-		gameBall.speed.x *= -0.5
+		gameBall.speed.x *= -0.8
 	}
 }
 

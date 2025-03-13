@@ -1,6 +1,5 @@
 package game
 
-import "core:fmt"
 import "core:strconv"
 import "core:strings"
 import rl "vendor:raylib"
@@ -182,6 +181,20 @@ draw_game_ball :: proc() {
 
 // Generates level string from level
 level_to_string :: proc(level: Level) -> cstring {
+	// Level is stored as a string of hexadecimal characters:
+	// Each byte holds state of 8 booleans
+	// Bits of first byte specify which spawners are visible
+	// Bits of second byte specfy which flippers in the first row are visible
+	// Bits of a third byte specfy which filppers in the first row have direction towards right
+	// etc...
+	// Structure is like this:
+	// SS,FFDD,FFDD,FFDD,FFDD,HH
+	// 
+	// SS -> which spawners are visible
+	// FF -> which flippers are visible in corresponding row
+	// DD -> which flippers in corresponding row point right
+	// HH -> which hatches are visible
+
 	ret: string
 
 	// spawners
@@ -228,8 +241,44 @@ level_to_string :: proc(level: Level) -> cstring {
 }
 
 // Decodes the level string and populates the level accordingly
-string_to_level :: proc(levelString: string, level: ^Level) {
+string_to_level :: proc(levelString: cstring, level: ^Level) {
+	// see level_to_string for string format 
+	str: string = string(levelString)
+	str, _ = strings.replace_all(str, ",", "")
 
+	// spawners
+	spawner_string, _ := strings.substring(str, 0, 2)
+	spawner_bits, _ := strconv.parse_int(spawner_string, 16)
+	for &spawner in level.spawner {
+		spawner.active = (spawner_bits & 1) == 1
+		spawner_bits = spawner_bits >> 1
+	}
+
+	// flippers
+	for y := 0; y < 4; y += 1 {
+		flipBlockStart := 2 + y * 4
+		flipper_string, _ := strings.substring(str, flipBlockStart, flipBlockStart + 2)
+		flipper_bits, _ := strconv.parse_int(flipper_string, 16)
+
+		flipper_dir_string, _ := strings.substring(str, flipBlockStart + 2, flipBlockStart + 4)
+		flipper_dir_bits, _ := strconv.parse_int(flipper_dir_string, 16)
+		for x := 0; x < 8; x += 1 {
+			flipper := &level.flipper[y][x]
+			flipper.active = (flipper_bits & 1) == 1
+			flipper_bits = flipper_bits >> 1
+
+			flipper.direction = (flipper_dir_bits & 1) == 1 ? 1 : -1
+			flipper_dir_bits = flipper_dir_bits >> 1
+		}
+	}
+
+	// hatches
+	hatch_string, _ := strings.substring(str, 18, 20)
+	hatch_bits, _ := strconv.parse_int(hatch_string, 16)
+	for &hatch in level.hatch {
+		hatch.active = (hatch_bits & 1) == 1
+		hatch_bits = hatch_bits >> 1
+	}
 }
 
 int_to_string :: proc(value: i64) -> string {
