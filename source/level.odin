@@ -1,5 +1,6 @@
 package game
 
+import "core:fmt"
 import "core:strconv"
 import "core:strings"
 import rl "vendor:raylib"
@@ -113,14 +114,13 @@ draw_level_borders :: proc() {
 		{f32(WINDOW_SIZE.x - 6), 30, 6, f32(WINDOW_SIZE.y - 30)},
 		LEVEL_SHADOW_COLOR,
 	)
-
 }
 
 draw_level_stats :: proc(level: Level) {
 	if design_mode {
 		level_code := level_to_string(level)
 		// rl.DrawText("DESIGN MODE", 8, 8, 22, rl.RED)
-		rl.DrawText(level_code, 8, 8, 22, rl.RED)
+		rl.DrawText(level_code, 8, 8, 22, rl.SKYBLUE)
 	} else {
 		rl.DrawText(level.name, 8, 8, 22, LEVEL_NAME_COLOR)
 	}
@@ -182,16 +182,49 @@ draw_game_ball :: proc() {
 
 // Generates level string from level
 level_to_string :: proc(level: Level) -> cstring {
-	spawner_bits: i32
+	ret: string
 
+	// spawners
+	spawner_bits: i32 = 0
 	#reverse for spawner in level.spawner {
 		spawner_bits = spawner_bits << 1
 		if spawner.active {
 			spawner_bits |= 1
 		}
 	}
+	ret = int_to_string(i64(spawner_bits))
 
-	return int_to_string(i64(spawner_bits))
+	// flippers
+	for y := 0; y < 4; y += 1 {
+		flipper_visiblity_bits: i32 = 0
+		flipper_direction_bits: i32 = 0
+
+		for x := 7; x >= 0; x -= 1 {
+			flipper := level.flipper[y][x]
+			flipper_visiblity_bits = flipper_visiblity_bits << 1
+			flipper_direction_bits = flipper_direction_bits << 1
+			if flipper.active {
+				flipper_visiblity_bits |= 1
+			}
+			if flipper.direction > 0 {
+				flipper_direction_bits |= 1
+			}
+		}
+		ret = strings.join({ret, ",", int_to_string(i64(flipper_visiblity_bits))}, "")
+		ret = strings.join({ret, int_to_string(i64(flipper_direction_bits))}, "")
+	}
+
+	// hatches
+	hatch_bits: i32 = 0
+	#reverse for hatch in level.hatch {
+		hatch_bits = hatch_bits << 1
+		if hatch.active {
+			hatch_bits |= 1
+		}
+	}
+	ret = strings.join({ret, ",", int_to_string(i64(hatch_bits))}, "")
+
+	return strings.clone_to_cstring(ret)
 }
 
 // Decodes the level string and populates the level accordingly
@@ -199,10 +232,12 @@ string_to_level :: proc(levelString: string, level: ^Level) {
 
 }
 
-int_to_string :: proc(value: i64) -> cstring {
+int_to_string :: proc(value: i64) -> string {
 	buf: [4]byte
-	result := strings.clone_to_cstring(strconv.append_int(buf[:], value, 10))
-	// fmt.println(result, buf)
+	result := strings.to_upper(strconv.append_int(buf[:], value, 16))
+	if value <= 15 {
+		result = strings.join({"0", result}, "")
+	}
 	return result
 }
 

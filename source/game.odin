@@ -18,6 +18,7 @@ gravity: f32 = 200
 
 design_mode := false
 help_visible := false
+status_message: cstring = ""
 
 init :: proc() {
 	run = true
@@ -33,7 +34,6 @@ update :: proc() {
 	rl.ClearBackground(back_color)
 
 	if rl.IsKeyPressed(rl.KeyboardKey.D) {
-		// if rl.IsKeyPressed(rl.KeyboardKey.F10) && ODIN_OS != .JS {
 		design_mode = !design_mode
 	}
 
@@ -44,6 +44,7 @@ update :: proc() {
 	// update ball position (if it exists)
 	if ballInPlay {
 		gameBall.speed.y += gravity * frame_time
+		gameBall.speed.x *= 0.983
 		gameBall.center += gameBall.speed * frame_time
 		gameBall.radius = 13
 
@@ -81,10 +82,12 @@ update :: proc() {
 		draw_help()
 	}
 
-	rl.DrawText("H: help", 8, WINDOW_SIZE.y - 16, 16, HELP_TEXT_COLOR)
-	// if ODIN_OS != .JS {
-	rl.DrawText("D: toggle design mode", 200, WINDOW_SIZE.y - 16, 16, HELP_TEXT_COLOR)
-	// }
+	if len(status_message) == 0 {
+		rl.DrawText("H: help", 8, WINDOW_SIZE.y - 16, 16, HELP_TEXT_COLOR)
+		rl.DrawText("D: toggle design mode", 200, WINDOW_SIZE.y - 16, 16, HELP_TEXT_COLOR)
+	} else {
+		rl.DrawText(status_message, 8, WINDOW_SIZE.y - 16, 16, HELP_TEXT_COLOR)
+	}
 
 	rl.EndDrawing()
 
@@ -138,7 +141,7 @@ flip_flipper_if_clicked :: proc() {
 		for x := 0; x < 8; x += 1 {
 			flip := &currentLevel.flipper[y][x]
 
-			if rectangle_intersects(mouse_pos, flip.rectangle) {
+			if flip.active && rectangle_intersects(mouse_pos, flip.rectangle) {
 				flip.direction *= -1
 				break
 			}
@@ -204,7 +207,7 @@ flipper_collision_check :: proc() {
 					//ball collided with flipper
 					flipper_center := get_rectangle_center(flip.rectangle)
 					gameBall.center.x = flipper_center.x
-					gameBall.speed.x = f32(flip.direction * 100)
+					gameBall.speed.x = f32(flip.direction * 200)
 					gameBall.speed.y = 0
 					gameBall.last_bounced_row = y
 					flip.direction *= -1
