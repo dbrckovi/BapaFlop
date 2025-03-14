@@ -13,6 +13,11 @@ HATCH_HEIGHT :: 40
 LEVEL_SHADOW_COLOR := rl.Color{40, 23, 51, 255}
 LEVEL_NAME_COLOR := rl.Color{214, 155, 128, 255}
 
+LevelDefinition :: struct {
+	name: cstring,
+	code: cstring,
+}
+
 Level :: struct {
 	name:    cstring, // name of the level
 	spawner: [8]Spawner, // array of all possible spawners
@@ -104,6 +109,9 @@ draw_level :: proc(level: Level) {
 		draw_game_ball()
 	}
 
+	if len(fullScreenMessage) > 0 {
+		rl.DrawText(fullScreenMessage, 50, 250, 90, fullScreenMessageColor)
+	}
 }
 
 draw_level_borders :: proc() {
@@ -242,6 +250,8 @@ level_to_string :: proc(level: Level) -> cstring {
 
 // Decodes the level string and populates the level accordingly
 string_to_level :: proc(levelString: cstring, level: ^Level) {
+	level.score = 0
+
 	// see level_to_string for string format 
 	str: string = string(levelString)
 	str, _ = strings.replace_all(str, ",", "")

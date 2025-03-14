@@ -2,15 +2,22 @@ package game
 
 import "core:fmt"
 import "core:strings"
+import "core:time"
 import rl "vendor:raylib"
 
 WINDOW_SIZE: [2]i32 = {800, 600}
 
 run: bool
+gameFinished := false
+allLevels: []LevelDefinition = {
+	{name = "Level 1", code = "FF,0011,0001,0001,0000,4A"},
+	{name = "Level 2", code = "FF,0011,0001,0001,0000,4A"},
+}
 
 back_color := rl.Color{49, 34, 73, 255}
 clipBoardLevelString: cstring = "FF,FF00,FF00,FF00,FF00,FF"
 currentLevel: Level
+currentLevelIndex := 0 // index of current level (in allLevels array)
 ballInPlay: bool
 gameBall: GameBall // relevant only if ballInPlay is true TODO: convert to Maybe(GameBall)
 gravity: f32 = 200
@@ -20,13 +27,19 @@ design_mode := false
 help_visible := false
 status_message: cstring = ""
 
+fullScreenMessage: cstring = ""
+fullScreenMessageColor: rl.Color = rl.WHITE
+fullScreenMessageShownTime := time.now()
+fullScreenMessageDuration_sec := 3
+
 init :: proc() {
 	run = true
 	rl.SetConfigFlags({.VSYNC_HINT})
 	rl.SetTargetFPS(500)
 	rl.InitWindow(WINDOW_SIZE.x, WINDOW_SIZE.y, "BapaFlop")
 	currentLevel = init_level()
-	// string_to_level("BD,7E08,7E1C,7E08,7E08,66", &currentLevel)
+	string_to_level(allLevels[currentLevelIndex].code, &currentLevel)
+	currentLevel.name = allLevels[currentLevelIndex].name
 }
 
 update :: proc() {
@@ -34,6 +47,37 @@ update :: proc() {
 	rl.BeginDrawing()
 	rl.ClearBackground(back_color)
 
+	if !gameFinished {
+		process_inputs(frame_time)
+	}
+
+	if len(fullScreenMessage) > 0 {
+		time_since_shown := time.diff(fullScreenMessageShownTime, time.now())
+		if time_since_shown > time.Duration(fullScreenMessageDuration_sec) * time.Second {
+			hide_full_screen_message()
+		}
+	}
+
+	draw_level(currentLevel)
+
+	if help_visible {
+		draw_help()
+	}
+
+	if len(status_message) == 0 && !ballInPlay {
+		rl.DrawText("H: help", 8, WINDOW_SIZE.y - 16, 16, HELP_TEXT_COLOR)
+		rl.DrawText("D: toggle design mode", 200, WINDOW_SIZE.y - 16, 16, HELP_TEXT_COLOR)
+	} else {
+		rl.DrawText(status_message, 8, WINDOW_SIZE.y - 16, 16, HELP_TEXT_COLOR)
+	}
+
+	rl.EndDrawing()
+
+	// Anything allocated using temp allocator is invalid after this.
+	free_all(context.temp_allocator)
+}
+
+process_inputs :: proc(frame_time: f32) {
 	// update ball position (if it exists)
 	if ballInPlay {
 		gameBall.speed.y += gravity * frame_time
@@ -45,11 +89,30 @@ update :: proc() {
 
 		if gameBall.center.y > f32(WINDOW_SIZE.y) {
 			ballInPlay = false
-			//TODO: replace this with game over logic
+			show_full_screen_message(" ! TRY AGAIN !", 5, rl.RED)
+			string_to_level(allLevels[currentLevelIndex].code, &currentLevel)
+
 		}
 
 		flipper_collision_check()
 		wall_collision_check()
+		if !design_mode {
+			basket_collision_check()
+
+			if currentLevel.score >= currentLevel.balls {
+				show_full_screen_message(" NEXT LEVEL ", 3, rl.GREEN)
+				currentLevelIndex += 1
+
+				if (currentLevelIndex >= len(allLevels)) {
+					show_full_screen_message(" ! CONGRATS !", 3000, rl.GOLD)
+					gameFinished = true
+				} else {
+					string_to_level(allLevels[currentLevelIndex].code, &currentLevel)
+					currentLevel.name = allLevels[currentLevelIndex].name
+				}
+			}
+		}
+
 	} else {
 		if rl.IsKeyPressed(rl.KeyboardKey.D) {
 			design_mode = !design_mode
@@ -74,12 +137,15 @@ update :: proc() {
 		}
 
 		if rl.IsMouseButtonReleased(rl.MouseButton.LEFT) {
+			help_visible = false
 			spawn_ball_if_clicked()
 			if design_mode {
 				flip_flipper_if_clicked()
 			}
 		}
+
 		if rl.IsMouseButtonReleased(rl.MouseButton.RIGHT) {
+			help_visible = false
 			if design_mode {
 				toggle_flipper_active_if_clicked()
 				toggle_spawner_active_if_clicked()
@@ -87,25 +153,6 @@ update :: proc() {
 			}
 		}
 	}
-
-
-	draw_level(currentLevel)
-
-	if help_visible {
-		draw_help()
-	}
-
-	if len(status_message) == 0 && !ballInPlay {
-		rl.DrawText("H: help", 8, WINDOW_SIZE.y - 16, 16, HELP_TEXT_COLOR)
-		rl.DrawText("D: toggle design mode", 200, WINDOW_SIZE.y - 16, 16, HELP_TEXT_COLOR)
-	} else {
-		rl.DrawText(status_message, 8, WINDOW_SIZE.y - 16, 16, HELP_TEXT_COLOR)
-	}
-
-	rl.EndDrawing()
-
-	// Anything allocated using temp allocator is invalid after this.
-	free_all(context.temp_allocator)
 }
 
 // In a web build, this is called when browser changes size. Remove the
@@ -136,6 +183,7 @@ spawn_ball_if_clicked :: proc() {
 	mouse_pos := rl.GetMousePosition()
 	for spawner in currentLevel.spawner {
 		if rectangle_intersects(mouse_pos, spawner.rectangle) && spawner.active {
+			hide_full_screen_message()
 			gameBall = {
 				center           = get_rectangle_center(spawner.rectangle),
 				speed            = rl.Vector2{0, 0},
@@ -230,6 +278,16 @@ flipper_collision_check :: proc() {
 	}
 }
 
+basket_collision_check :: proc() {
+	for &hatch in currentLevel.hatch {
+		if hatch.active && rectangle_intersects(gameBall.center, hatch.rectangle) {
+			hatch.active = false
+			currentLevel.score += 1
+			ballInPlay = false
+		}
+	}
+}
+
 // Checks if Vector2 is inside Rectangle
 rectangle_intersects :: proc(point: rl.Vector2, rect: rl.Rectangle) -> bool {
 	return(
@@ -260,5 +318,16 @@ draw_help :: proc() {
 
 	text: cstring = design_mode ? HELP_TEXT_DESIGN : HELP_TEXT_GAME
 	rl.DrawText(text, 35, 75, 20, HELP_TEXT_COLOR)
+}
+
+show_full_screen_message :: proc(message: cstring, duration_sec: int, color: rl.Color) {
+	fullScreenMessage = message
+	fullScreenMessageShownTime = time.now()
+	fullScreenMessageColor = color
+	fullScreenMessageDuration_sec = duration_sec
+}
+
+hide_full_screen_message :: proc() {
+	fullScreenMessage = ""
 }
 
