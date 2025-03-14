@@ -11,7 +11,7 @@ run: bool
 gameFinished := false
 allLevels: []LevelDefinition = {
 	{name = "Level 1", code = "FF,0011,0001,0001,0000,4A"},
-	{name = "Level 2", code = "FF,0011,0001,0001,0000,4A"},
+	{name = "Level 2", code = "0C,0415,0809,1411,2020,4A"},
 }
 
 back_color := rl.Color{49, 34, 73, 255}
@@ -89,9 +89,10 @@ process_inputs :: proc(frame_time: f32) {
 
 		if gameBall.center.y > f32(WINDOW_SIZE.y) {
 			ballInPlay = false
-			show_full_screen_message(" ! TRY AGAIN !", 5, rl.RED)
-			string_to_level(allLevels[currentLevelIndex].code, &currentLevel)
-
+			if !design_mode {
+				show_full_screen_message(" ! TRY AGAIN !", 5, rl.RED)
+				string_to_level(allLevels[currentLevelIndex].code, &currentLevel)
+			}
 		}
 
 		flipper_collision_check()
