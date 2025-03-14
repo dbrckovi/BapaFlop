@@ -10,12 +10,20 @@ WINDOW_SIZE: [2]i32 = {800, 600}
 run: bool
 gameFinished := false
 allLevels: []LevelDefinition = {
-	{name = "Level 1", code = "FF,0011,0001,0001,0000,4A"},
-	{name = "Level 2", code = "0C,0415,0809,1411,2020,4A"},
+	{name = "Level 1", code = "FF,0011,0001,0001,0000,4A,3"},
+	{name = "Level 2", code = "81,81D1,8186,81D0,8188,83,3"},
+	{name = "Level 3", code = "0C,0415,0809,1411,2020,4A,3"},
+	{name = "Level 4", code = "18,1809,3C0B,1011,0009,2C,3"},
+	{name = "Level 5", code = "FF,FF00,7EFF,3C00,18FF,70,3"},
+	{name = "Level 6", code = "3F,FF45,FF55,FF55,FF75,0E,3"},
+	{name = "Level 7", code = "FF,FFD4,FF08,FF2A,FFAA,E0,3"},
+	{name = "Level 8", code = "FF,FFD4,FF08,FF2A,FFAA,F0,4"},
+	{name = "Level 9", code = "FF,7EF6,FF1B,7E1E,10AA,3C,3"},
+	{name = "Level 10", code = "FF,FF8B,FF59,FF46,FFE8,9B,5"},
 }
 
 back_color := rl.Color{49, 34, 73, 255}
-clipBoardLevelString: cstring = "FF,FF00,FF00,FF00,FF00,FF"
+clipBoardLevelString: cstring = "FF,FF00,FF00,FF00,FF00,FF,3"
 currentLevel: Level
 currentLevelIndex := 0 // index of current level (in allLevels array)
 ballInPlay: bool
@@ -115,6 +123,29 @@ process_inputs :: proc(frame_time: f32) {
 		}
 
 	} else {
+		// TODO: delete this before release
+		// if rl.IsKeyPressed(rl.KeyboardKey.N) {
+		// 	if currentLevelIndex < len(allLevels) - 1 {
+		// 		currentLevelIndex += 1
+		// 	} else {
+		// 		currentLevelIndex = 0
+		// 	}
+		// 	string_to_level(allLevels[currentLevelIndex].code, &currentLevel)
+		// 	currentLevel.name = allLevels[currentLevelIndex].name
+		// }
+
+		// TODO: delete this before release
+		// if rl.IsKeyPressed(rl.KeyboardKey.P) {
+		// 	if currentLevelIndex > 0 {
+		// 		currentLevelIndex -= 1
+		// 	} else {
+		// 		currentLevelIndex = len(allLevels) - 1
+		// 	}
+
+		// 	string_to_level(allLevels[currentLevelIndex].code, &currentLevel)
+		// 	currentLevel.name = allLevels[currentLevelIndex].name
+		// }
+
 		if rl.IsKeyPressed(rl.KeyboardKey.D) {
 			design_mode = !design_mode
 		}
@@ -123,21 +154,24 @@ process_inputs :: proc(frame_time: f32) {
 			help_visible = !help_visible
 		}
 
-		if rl.IsKeyPressed(rl.KeyboardKey.C) {
-			clipBoardLevelString = level_to_string(currentLevel)
-			status_message = strings.clone_to_cstring(
-				strings.join({"Level saved: ", string(clipBoardLevelString)}, ""),
-			)
-		}
+		if design_mode {
+			if rl.IsKeyPressed(rl.KeyboardKey.C) {
+				clipBoardLevelString = level_to_string(currentLevel)
+				status_message = strings.clone_to_cstring(
+					strings.join({"Level saved: ", string(clipBoardLevelString)}, ""),
+				)
+			}
 
-		if rl.IsKeyPressed(rl.KeyboardKey.V) {
-			string_to_level(clipBoardLevelString, &currentLevel)
-			status_message = strings.clone_to_cstring(
-				strings.join({"Level restored: ", string(clipBoardLevelString)}, ""),
-			)
+			if rl.IsKeyPressed(rl.KeyboardKey.V) {
+				string_to_level(clipBoardLevelString, &currentLevel)
+				status_message = strings.clone_to_cstring(
+					strings.join({"Level restored: ", string(clipBoardLevelString)}, ""),
+				)
+			}
 		}
 
 		if rl.IsMouseButtonReleased(rl.MouseButton.LEFT) {
+			hide_full_screen_message()
 			help_visible = false
 			spawn_ball_if_clicked()
 			if design_mode {
@@ -184,7 +218,6 @@ spawn_ball_if_clicked :: proc() {
 	mouse_pos := rl.GetMousePosition()
 	for spawner in currentLevel.spawner {
 		if rectangle_intersects(mouse_pos, spawner.rectangle) && spawner.active {
-			hide_full_screen_message()
 			gameBall = {
 				center           = get_rectangle_center(spawner.rectangle),
 				speed            = rl.Vector2{0, 0},

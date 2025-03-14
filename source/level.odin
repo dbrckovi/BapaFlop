@@ -289,6 +289,11 @@ string_to_level :: proc(levelString: cstring, level: ^Level) {
 		hatch.active = (hatch_bits & 1) == 1
 		hatch_bits = hatch_bits >> 1
 	}
+
+	// balls
+	balls_string, _ := strings.substring(str, 20, 21)
+	balls_bits, _ := strconv.parse_int(balls_string, 10)
+	level.balls = i32(balls_bits)
 }
 
 int_to_string :: proc(value: i64) -> string {
