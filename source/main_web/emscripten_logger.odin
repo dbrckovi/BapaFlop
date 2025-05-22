@@ -15,33 +15,39 @@ import "core:strings"
 
 Emscripten_Logger_Opts :: log.Options{.Level, .Short_File_Path, .Line}
 
-create_emscripten_logger :: proc (lowest := log.Level.Debug, opt := Emscripten_Logger_Opts) -> log.Logger {
+create_emscripten_logger :: proc(
+	lowest := log.Level.Debug,
+	opt := Emscripten_Logger_Opts,
+) -> log.Logger {
 	return log.Logger{data = nil, procedure = logger_proc, lowest_level = lowest, options = opt}
 }
 
 // This create's a binding to `puts` which will be linked in as part of the
 // emscripten runtime.
 @(default_calling_convention = "c")
-foreign {
+foreign _ {
 	puts :: proc(buffer: cstring) -> c.int ---
 }
 
-@(private="file")
+@(private = "file")
 logger_proc :: proc(
 	logger_data: rawptr,
 	level: log.Level,
 	text: string,
 	options: log.Options,
-	location := #caller_location
+	location := #caller_location,
 ) {
 	b := strings.builder_make(context.temp_allocator)
 	strings.write_string(&b, Level_Headers[level])
 	do_location_header(options, &b, location)
 	fmt.sbprint(&b, text)
-	puts(strings.to_cstring(&b))
+	// puts(strings.to_cstring(&b))
+	if bc, bc_err := strings.to_cstring(&b); bc_err == nil {
+		puts(bc)
+	}
 }
 
-@(private="file")
+@(private = "file")
 Level_Headers := [?]string {
 	0 ..< 10 = "[DEBUG] --- ",
 	10 ..< 20 = "[INFO ] --- ",
@@ -50,8 +56,12 @@ Level_Headers := [?]string {
 	40 ..< 50 = "[FATAL] --- ",
 }
 
-@(private="file")
-do_location_header :: proc(opts: log.Options, buf: ^strings.Builder, location := #caller_location) {
+@(private = "file")
+do_location_header :: proc(
+	opts: log.Options,
+	buf: ^strings.Builder,
+	location := #caller_location,
+) {
 	if log.Location_Header_Opts & opts == nil {
 		return
 	}
@@ -86,3 +96,4 @@ do_location_header :: proc(opts: log.Options, buf: ^strings.Builder, location :=
 
 	fmt.sbprint(buf, "] ")
 }
+
